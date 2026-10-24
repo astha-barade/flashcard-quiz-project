@@ -1,0 +1,27 @@
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+application-local.properties
+application-local.yml
+
+# Frontend dependencies and builds
+node_modules/
+dist/
+build/
+
+# Java / Spring Boot
+target/
+*.class
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# IDE workspace files may contain local settings or secrets
+.idea/
+*.iml
