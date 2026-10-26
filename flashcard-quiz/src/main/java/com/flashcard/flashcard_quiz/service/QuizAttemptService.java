@@ -1,5 +1,5 @@
 package com.flashcard.flashcard_quiz.service;
-
+import java.time.LocalDate;
 import com.flashcard.flashcard_quiz.entity.Question;
 import com.flashcard.flashcard_quiz.entity.Quiz;
 import com.flashcard.flashcard_quiz.entity.QuizAttempt;
@@ -49,18 +49,21 @@ public class QuizAttemptService {
 
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new RuntimeException("Quiz not found"));
-
         if (!quiz.isPublished()) {
             throw new RuntimeException("Quiz is not published");
         }
-
+        if (!quiz.getQuizDate().equals(LocalDate.now())) {
+            throw new RuntimeException(
+                    "Only today's quiz can be attempted"
+            );
+        }
         if (attemptRepository
                 .findByStudentIdAndQuizId(studentId, quizId).isPresent()) {
             throw new RuntimeException("Quiz already submitted");
         }
 
         List<Question> questions =
-                questionRepository.findByQuizId(quizId);
+                questionRepository.findByQuizIdAndArchivedFalse(quizId);
 
         if (questions.isEmpty()) {
             throw new RuntimeException("Quiz has no questions");
@@ -197,4 +200,74 @@ public class QuizAttemptService {
             default -> null;
         };
     }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getAdminAnalytics() {
+        List<Quiz> quizzes = quizRepository.findAll();
+        List<QuizAttempt> attempts = attemptRepository.findAllByOrderBySubmittedAtDesc();
+
+        long publishedCount = quizzes.stream().filter(Quiz::isPublished).count();
+        long draftCount = quizzes.size() - publishedCount;
+
+        double avgScore = attempts.isEmpty() ? 0.0 :
+                attempts.stream().mapToInt(QuizAttempt::getScore).average().orElse(0.0);
+
+        double avgPercentage = attempts.isEmpty() ? 0.0 :
+                attempts.stream()
+                        .mapToDouble(a -> a.getTotalQuestions() != null && a.getTotalQuestions() > 0
+                                ? ((double) a.getScore() * 100.0) / a.getTotalQuestions()
+                                : 0.0)
+                        .average().orElse(0.0);
+
+        long uniqueStudents = attempts.stream()
+                .map(a -> a.getStudent() != null ? a.getStudent().getId() : null)
+                .filter(Objects::nonNull)
+                .distinct()
+                .count();
+
+        Map<String, Object> analytics = new HashMap<>();
+        analytics.put("totalQuizzes", quizzes.size());
+        analytics.put("publishedQuizzes", publishedCount);
+        analytics.put("draftQuizzes", draftCount);
+        analytics.put("totalAttempts", attempts.size());
+        analytics.put("uniqueStudents", uniqueStudents);
+        analytics.put("averageScore", Math.round(avgScore * 10.0) / 10.0);
+        analytics.put("averagePercentage", Math.round(avgPercentage * 10.0) / 10.0);
+
+        return analytics;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getAllAttemptsForAdmin() {
+        List<QuizAttempt> attempts = attemptRepository.findAllByOrderBySubmittedAtDesc();
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (QuizAttempt a : attempts) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", a.getId());
+            map.put("attemptId", a.getId());
+            if (a.getStudent() != null) {
+                map.put("studentId", a.getStudent().getId());
+                map.put("studentName", a.getStudent().getName());
+                map.put("studentEmail", a.getStudent().getEmail());
+            }
+            if (a.getQuiz() != null) {
+                map.put("quizId", a.getQuiz().getId());
+                map.put("quizTitle", a.getQuiz().getTitle());
+                map.put("quizTopic", a.getQuiz().getTopic());
+                map.put("quizDate", a.getQuiz().getQuizDate());
+            }
+            map.put("score", a.getScore());
+            map.put("totalQuestions", a.getTotalQuestions());
+            double pct = a.getTotalQuestions() != null && a.getTotalQuestions() > 0
+                    ? ((double) a.getScore() * 100.0) / a.getTotalQuestions()
+                    : 0.0;
+            map.put("percentage", Math.round(pct * 10.0) / 10.0);
+            map.put("submittedAt", a.getSubmittedAt());
+            result.add(map);
+        }
+
+        return result;
+    }
 }
+

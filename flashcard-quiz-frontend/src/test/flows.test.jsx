@@ -264,4 +264,133 @@ describe('full journey: admin builds a quiz, student takes it', () => {
     renderApp('/results/99')
     expect(await screen.findByText('No result found')).toBeInTheDocument()
   })
+
+  it('admin can edit and delete quizzes through modals with real-time list updates and safety checks', async () => {
+    const user = userEvent.setup()
+    mock.db.quizzes.push(
+      { id: 1, quizDate: '2030-05-01', title: 'Original Quiz Title', topic: 'Original Topic', published: false, createdAt: '2026-01-01T00:00:00', createdBy: 1 },
+      { id: 2, quizDate: '2030-05-02', title: 'Quiz With Attempt', topic: 'Active', published: true, createdAt: '2026-01-01T00:00:00', createdBy: 1 }
+    )
+    mock.db.questions.push(
+      { id: 1, quizId: 1, questionText: 'Q1', optionA: 'a', optionB: 'b', optionC: 'c', optionD: 'd', correctOption: 'A' },
+      { id: 2, quizId: 2, questionText: 'Q2', optionA: '1', optionB: '2', optionC: '3', optionD: '4', correctOption: 'B' }
+    )
+    mock.db.attempts.push({ id: 1, studentId: 2, quizId: 2, score: 1, totalQuestions: 1, submittedAt: '2026-01-01T00:00:00' })
+
+    await asAdmin()
+    renderApp('/admin')
+
+    expect(await screen.findByText('Original Quiz Title')).toBeInTheDocument()
+    expect(screen.getByText('Quiz With Attempt')).toBeInTheDocument()
+
+    // 1. Edit Quiz
+    const quiz1Item = screen.getByText('Original Quiz Title').closest('li')
+    await user.click(within(quiz1Item).getByRole('button', { name: 'Edit' }))
+
+    const editModal = screen.getByRole('dialog', { name: /Edit quiz/i })
+    expect(editModal).toBeInTheDocument()
+
+    const titleInput = within(editModal).getByLabelText('Title')
+    expect(titleInput).toHaveValue('Original Quiz Title')
+    await user.clear(titleInput)
+    await user.type(titleInput, 'Renamed Quiz Title')
+
+    await user.click(within(editModal).getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText(/Quiz "Renamed Quiz Title" \(ID 1\) updated successfully/)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Renamed Quiz Title')).toBeInTheDocument()
+    expect(mock.db.quizzes.find((q) => q.id === 1).title).toBe('Renamed Quiz Title')
+
+    // 2. Unpublish a published quiz
+    const quiz2Item = screen.getByText('Quiz With Attempt').closest('li')
+    expect(within(quiz2Item).getByText('Published')).toBeInTheDocument()
+    await user.click(within(quiz2Item).getByRole('button', { name: 'Unpublish' }))
+    await user.click(within(quiz2Item).getByRole('button', { name: 'Confirm unpublish' }))
+    expect(await screen.findByText(/"Quiz With Attempt" has been unpublished/)).toBeInTheDocument()
+    expect(mock.db.quizzes.find((q) => q.id === 2).published).toBe(false)
+
+    // 3. Delete Question & Edit Question
+    // Questions for Quiz #1 are displayed in the questions card
+    expect(await screen.findByText(/Questions in Quiz #1/)).toBeInTheDocument()
+    expect(screen.getByText(/#1\. Q1/)).toBeInTheDocument()
+
+    // Edit Question
+    const qItem = screen.getByText(/#1\. Q1/).closest('li')
+    await user.click(within(qItem).getByRole('button', { name: 'Edit' }))
+    const editQModal = screen.getByRole('dialog', { name: /Edit Question/i })
+    const qTextInput = within(editQModal).getByLabelText('Question text')
+    await user.clear(qTextInput)
+    await user.type(qTextInput, 'Updated Q1 text')
+    await user.click(within(editQModal).getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText(/Question #1 updated successfully/)).toBeInTheDocument()
+    expect(mock.db.questions.find((q) => q.id === 1).questionText).toBe('Updated Q1 text')
+
+    // Delete Question (when no attempts)
+    const updatedQItem = screen.getByText(/#1\. Updated Q1 text/).closest('li')
+    await user.click(within(updatedQItem).getByRole('button', { name: 'Delete' }))
+    const deleteQModal = screen.getByRole('dialog', { name: /Delete Question/i })
+    await user.click(within(deleteQModal).getByRole('button', { name: 'Confirm delete' }))
+    expect(await screen.findByText(/Question #1 deleted successfully/)).toBeInTheDocument()
+    expect(mock.db.questions.some((q) => q.id === 1)).toBe(false)
+
+    // Select Quiz #2 (which has student attempts) to test question deletion guard and archiving
+    await user.selectOptions(screen.getByLabelText('Quiz'), '2')
+    expect(await screen.findByText(/Questions in Quiz #2/)).toBeInTheDocument()
+    expect(screen.getByText(/#1\. Q2/)).toBeInTheDocument()
+
+    const q2Item = screen.getByText(/#1\. Q2/).closest('li')
+    await user.click(within(q2Item).getByRole('button', { name: 'Delete' }))
+    const deleteQ2Modal = screen.getByRole('dialog', { name: /Delete Question/i })
+    expect(within(deleteQ2Modal).getByText(/Permanent deletion blocked/)).toBeInTheDocument()
+    expect(within(deleteQ2Modal).getByRole('button', { name: 'Confirm delete' })).toBeDisabled()
+
+    // Click "Archive Question" from modal
+    await user.click(within(deleteQ2Modal).getByRole('button', { name: 'Archive Question' }))
+    expect(await screen.findByText(/Question #2 has been archived/)).toBeInTheDocument()
+    expect(mock.db.questions.find((q) => q.id === 2).archived).toBe(true)
+
+    // Verify Archived badge is displayed in question list
+    expect(screen.getByText('Archived')).toBeInTheDocument()
+
+    // 4. Delete Quiz (successful when no attempts)
+    const renamedQuizItem = screen.getByText('Renamed Quiz Title').closest('li')
+    await user.click(within(renamedQuizItem).getByRole('button', { name: 'Delete' }))
+
+    const deleteModal = screen.getByRole('dialog', { name: /Delete quiz/i })
+    expect(deleteModal).toBeInTheDocument()
+    expect(within(deleteModal).getByText(/Renamed Quiz Title/)).toBeInTheDocument()
+
+    await user.click(within(deleteModal).getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await screen.findByText(/Quiz "Renamed Quiz Title" \(ID 1\) deleted successfully/)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByText('Renamed Quiz Title')).not.toBeInTheDocument()
+    expect(mock.db.quizzes.some((q) => q.id === 1)).toBe(false)
+
+    // 5. Delete Quiz (blocked when attempts exist)
+    const quiz2ItemNow = screen.getByText('Quiz With Attempt').closest('li')
+    await user.click(within(quiz2ItemNow).getByRole('button', { name: 'Delete' }))
+
+    const blockDeleteModal = screen.getByRole('dialog', { name: /Delete quiz/i })
+    await user.click(within(blockDeleteModal).getByRole('button', { name: 'Confirm delete' }))
+
+    expect(await within(blockDeleteModal).findByText('Cannot delete quiz because students have submitted attempts')).toBeInTheDocument()
+    expect(mock.db.quizzes.some((q) => q.id === 2)).toBe(true)
+
+    // Close the blocked delete dialog
+    await user.click(within(blockDeleteModal).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Quiz With Attempt')).toBeInTheDocument()
+
+    // 6. Create another admin account
+    await user.type(screen.getByLabelText('Full name'), 'Bob Admin')
+    await user.type(screen.getByLabelText('Email address'), 'bob.admin@test.com')
+    await user.type(screen.getByLabelText('Password'), 'adminpass123')
+    await user.click(screen.getByRole('button', { name: 'Create admin account' }))
+
+    expect(await screen.findByText(/Admin account for "Bob Admin" \(bob\.admin@test\.com\) created successfully/)).toBeInTheDocument()
+    expect(mock.db.users.some((u) => u.email === 'bob.admin@test.com' && u.role === 'ADMIN')).toBe(true)
+  })
 })
+

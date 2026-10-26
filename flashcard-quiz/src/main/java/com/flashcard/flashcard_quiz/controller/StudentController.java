@@ -41,7 +41,7 @@ public class StudentController {
             Quiz quiz = quizService.getTodayQuiz();
 
             List<Map<String, Object>> questions =
-                    quizService.getQuestions(quiz.getId())
+                    quizService.getActiveQuestions(quiz.getId())
                             .stream()
                             .map(q -> {
                                 Map<String, Object> question =

@@ -93,5 +93,206 @@ describe('api service', () => {
       correct: true,
     })
   })
+
+  it('updates a quiz using PUT /api/admin/quizzes/{id}', async () => {
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const quiz = await api.createQuiz({ title: 'Initial Title', topic: 'Initial Topic', quizDate: '2030-02-01', adminId: 1 })
+
+    const updated = await api.updateQuiz(quiz.id, {
+      title: 'Updated Title',
+      topic: 'Updated Topic',
+      quizDate: '2030-02-02',
+    })
+
+    expect(updated).toMatchObject({
+      message: 'Quiz updated successfully',
+      id: quiz.id,
+      title: 'Updated Title',
+      topic: 'Updated Topic',
+      quizDate: '2030-02-02',
+    })
+
+    const call = mock.calls.at(-1)
+    expect(call.method).toBe('PUT')
+    expect(call.path).toBe(`/api/admin/quizzes/${quiz.id}`)
+    expect(call.body).toEqual({
+      title: 'Updated Title',
+      topic: 'Updated Topic',
+      quizDate: '2030-02-02',
+    })
+  })
+
+  it('deletes a quiz using DELETE /api/admin/quizzes/{id} and enforces safety rule on attempts', async () => {
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const quiz = await api.createQuiz({ title: 'Deletable Quiz', topic: 'Testing', quizDate: '2030-03-01', adminId: 1 })
+    await api.addQuestion({ quizId: quiz.id, questionText: 'Q?', optionA: '1', optionB: '2', optionC: '3', optionD: '4', correctOption: 'A' })
+    expect(mock.db.quizzes.some((q) => q.id === quiz.id)).toBe(true)
+    expect(mock.db.questions.some((q) => q.quizId === quiz.id)).toBe(true)
+
+    // Successful delete when no attempts exist
+    const res = await api.deleteQuiz(quiz.id)
+    expect(res).toMatchObject({ message: 'Quiz deleted successfully', quizId: quiz.id })
+    expect(mock.db.quizzes.some((q) => q.id === quiz.id)).toBe(false)
+    expect(mock.db.questions.some((q) => q.quizId === quiz.id)).toBe(false)
+
+    // Cannot delete quiz when student attempts exist
+    const quizWithAttempt = await api.createQuiz({ title: 'Quiz with Attempts', topic: 'Testing', quizDate: '2030-04-01', adminId: 1 })
+    await api.addQuestion({ quizId: quizWithAttempt.id, questionText: 'Q2?', optionA: '1', optionB: '2', optionC: '3', optionD: '4', correctOption: 'A' })
+    await api.publishQuiz(quizWithAttempt.id)
+
+    api.clearSession()
+    await api.loginUser({ email: 'student@test.com', password: 'studentpass' })
+    await api.submitQuiz(quizWithAttempt.id, 2, { 2: 'A' })
+
+    api.clearSession()
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    await expect(api.deleteQuiz(quizWithAttempt.id)).rejects.toMatchObject({
+      status: 400,
+      message: 'Cannot delete quiz because students have submitted attempts',
+    })
+    expect(mock.db.quizzes.some((q) => q.id === quizWithAttempt.id)).toBe(true)
+  })
+
+  it('unpublishes a quiz using POST /api/admin/quizzes/{id}/unpublish', async () => {
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const quiz = await api.createQuiz({ title: 'Unpublishable Quiz', topic: 'Testing', quizDate: '2030-05-01', adminId: 1 })
+    await api.addQuestion({ quizId: quiz.id, questionText: 'Q?', optionA: '1', optionB: '2', optionC: '3', optionD: '4', correctOption: 'A' })
+    await api.publishQuiz(quiz.id)
+    expect(mock.db.quizzes.find((q) => q.id === quiz.id).published).toBe(true)
+
+    const res = await api.unpublishQuiz(quiz.id)
+    expect(res).toMatchObject({ message: 'Quiz unpublished successfully', quizId: quiz.id })
+    expect(mock.db.quizzes.find((q) => q.id === quiz.id).published).toBe(false)
+  })
+
+  it('manages questions: get, update, and delete with attempt guard', async () => {
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const quiz = await api.createQuiz({ title: 'Question Quiz', topic: 'Testing', quizDate: '2030-06-01', adminId: 1 })
+    const q1 = await api.addQuestion({ quizId: quiz.id, questionText: 'Original text', optionA: '1', optionB: '2', optionC: '3', optionD: '4', correctOption: 'A' })
+
+    // View questions
+    const list = await api.getQuizQuestions(quiz.id)
+    expect(list).toHaveLength(1)
+    expect(list[0].id).toBe(q1.id)
+
+    const fetched = await api.getQuestion(q1.id)
+    expect(fetched.questionText).toBe('Original text')
+
+    // Update question
+    const updated = await api.updateQuestion(q1.id, {
+      quizId: quiz.id,
+      questionText: 'Updated text',
+      optionA: '10',
+      optionB: '20',
+      optionC: '30',
+      optionD: '40',
+      correctOption: 'B',
+    })
+    expect(updated).toMatchObject({
+      message: 'Question updated successfully',
+      question: expect.objectContaining({
+        questionText: 'Updated text',
+        correctOption: 'B',
+      }),
+    })
+
+    // Delete question
+    const delRes = await api.deleteQuestion(q1.id)
+    expect(delRes).toMatchObject({ message: 'Question deleted successfully', questionId: q1.id })
+    const remaining = await api.getQuizQuestions(quiz.id)
+    expect(remaining).toHaveLength(0)
+  })
+
+  it('retrieves analytics and attempt details for admin', async () => {
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const analytics = await api.getAdminAnalytics()
+    expect(analytics).toMatchObject({
+      totalQuizzes: expect.any(Number),
+      publishedQuizzes: expect.any(Number),
+      draftQuizzes: expect.any(Number),
+      totalAttempts: expect.any(Number),
+    })
+
+    const attempts = await api.getAdminAttempts()
+    expect(Array.isArray(attempts)).toBe(true)
+  })
+
+  it('creates another admin account securely', async () => {
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const res = await api.createAdminAccount({
+      name: 'Second Admin',
+      email: 'admin2@test.com',
+      password: 'newadminpass123',
+    })
+    expect(res).toMatchObject({
+      message: 'Admin account created successfully',
+      email: 'admin2@test.com',
+      role: 'ADMIN',
+    })
+    expect(mock.db.users.some((u) => u.email === 'admin2@test.com' && u.role === 'ADMIN')).toBe(true)
+  })
+
+  it('archives and unarchives questions, excluding archived from student attempts', async () => {
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const quiz = await api.createQuiz({ title: 'Daily Test', topic: 'Testing', quizDate: todayStr, adminId: 1 })
+    const q1 = await api.addQuestion({ quizId: quiz.id, questionText: 'Q1 Active', optionA: '1', optionB: '2', optionC: '3', optionD: '4', correctOption: 'A' })
+    const q2 = await api.addQuestion({ quizId: quiz.id, questionText: 'Q2 To Archive', optionA: 'A', optionB: 'B', optionC: 'C', optionD: 'D', correctOption: 'B' })
+    await api.publishQuiz(quiz.id)
+
+    // Archive q2
+    const archRes = await api.archiveQuestion(q2.id)
+    expect(archRes).toMatchObject({
+      message: 'Question archived successfully',
+      question: expect.objectContaining({ id: q2.id, archived: true }),
+    })
+
+    // Student takes quiz - only q1 should be present
+    api.clearSession()
+    await api.loginUser({ email: 'student@test.com', password: 'studentpass' })
+    const studentQuiz = await api.getTodayQuiz()
+    expect(studentQuiz.questions).toHaveLength(1)
+    expect(studentQuiz.questions[0].id).toBe(q1.id)
+
+    // Unarchive q2
+    api.clearSession()
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const unarchRes = await api.unarchiveQuestion(q2.id)
+    expect(unarchRes).toMatchObject({
+      message: 'Question unarchived successfully',
+      question: expect.objectContaining({ id: q2.id, archived: false }),
+    })
+  })
+
+  it('blocks question deletion when student attempts exist', async () => {
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const quiz = await api.createQuiz({ title: 'Attempted Quiz', topic: 'Testing', quizDate: todayStr, adminId: 1 })
+    const q1 = await api.addQuestion({ quizId: quiz.id, questionText: 'Q With Attempt', optionA: '1', optionB: '2', optionC: '3', optionD: '4', correctOption: 'A' })
+    await api.publishQuiz(quiz.id)
+
+    // Student submits attempt
+    api.clearSession()
+    await api.loginUser({ email: 'student@test.com', password: 'studentpass' })
+    await api.submitQuiz(quiz.id, 2, { [q1.id]: 'A' })
+
+    // Admin tries to delete question -> should fail
+    api.clearSession()
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    await expect(api.deleteQuestion(q1.id)).rejects.toMatchObject({
+      status: 400,
+      message: expect.stringContaining('Cannot delete question because students have submitted attempts'),
+    })
+
+    // Archiving still succeeds and preserves attempt history
+    const arch = await api.archiveQuestion(q1.id)
+    expect(arch.question.archived).toBe(true)
+
+    // Historical attempt review still works perfectly
+    const review = await api.getAdminAttemptDetails(mock.db.attempts.at(-1).id)
+    expect(review.hasDetailedReview).toBe(true)
+    expect(review.questions[0].questionText).toBe('Q With Attempt')
+  })
 })
+
 

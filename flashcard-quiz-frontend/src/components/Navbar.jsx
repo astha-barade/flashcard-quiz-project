@@ -8,7 +8,10 @@ const STUDENT_LINKS = [
   { to: '/quiz', label: "Today's Quiz" },
   { to: '/attempts', label: 'My Attempts' },
 ]
-const ADMIN_LINKS = [{ to: '/admin', label: 'Admin Dashboard' }]
+const ADMIN_LINKS = [
+  { to: '/admin', label: 'Admin Dashboard' },
+  { to: '/admin/analytics', label: 'Results & Analytics' },
+]
 
 export default function Navbar() {
   const { user, logout } = useAuth()

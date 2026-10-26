@@ -40,6 +40,17 @@ public class Question {
     @Column(nullable = false)
     private CorrectOption correctOption;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean archived = false;
+
+    public boolean isArchived() {
+        return archived;
+    }
+
+    public void setArchived(boolean archived) {
+        this.archived = archived;
+    }
+
     public enum CorrectOption {
         A, B, C, D
     }

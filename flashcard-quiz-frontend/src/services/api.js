@@ -205,8 +205,89 @@ export function publishQuiz(quizId) {
   return request(`/api/admin/quizzes/${quizId}/publish`, { method: 'POST' })
 }
 
+/** POST /api/admin/quizzes/{id}/unpublish -> { message, quizId } */
+export function unpublishQuiz(quizId) {
+  return request(`/api/admin/quizzes/${quizId}/unpublish`, { method: 'POST' })
+}
 
 export function getAdminQuizzes() {
   return request('/api/admin/quizzes')
+}
+
+/** PUT /api/admin/quizzes/{id} -> { message, id, title, topic, quizDate } */
+export function updateQuiz(id, { title, topic, quizDate }) {
+  return request(`/api/admin/quizzes/${id}`, {
+    method: 'PUT',
+    body: { title, topic, quizDate },
+  })
+}
+
+/** DELETE /api/admin/quizzes/{id} -> { message, quizId } */
+export function deleteQuiz(id) {
+  return request(`/api/admin/quizzes/${id}`, {
+    method: 'DELETE',
+  })
+}
+
+/** GET /api/admin/quizzes/{id}/questions -> array of Question */
+export function getQuizQuestions(quizId) {
+  return request(`/api/admin/quizzes/${quizId}/questions`)
+}
+
+/** GET /api/admin/questions/{id} -> Question */
+export function getQuestion(questionId) {
+  return request(`/api/admin/questions/${questionId}`)
+}
+
+/** PUT /api/admin/questions/{id} -> { message, question } */
+export function updateQuestion(questionId, question) {
+  return request(`/api/admin/questions/${questionId}`, {
+    method: 'PUT',
+    body: question,
+  })
+}
+
+/** DELETE /api/admin/questions/{id} -> { message, questionId } */
+export function deleteQuestion(questionId) {
+  return request(`/api/admin/questions/${questionId}`, {
+    method: 'DELETE',
+  })
+}
+
+/** POST /api/admin/questions/{id}/archive -> { message, question } */
+export function archiveQuestion(questionId) {
+  return request(`/api/admin/questions/${questionId}/archive`, {
+    method: 'POST',
+  })
+}
+
+/** POST /api/admin/questions/{id}/unarchive -> { message, question } */
+export function unarchiveQuestion(questionId) {
+  return request(`/api/admin/questions/${questionId}/unarchive`, {
+    method: 'POST',
+  })
+}
+
+/** GET /api/admin/analytics -> { totalQuizzes, publishedQuizzes, draftQuizzes, totalAttempts, uniqueStudents, averageScore, averagePercentage } */
+export function getAdminAnalytics() {
+  return request('/api/admin/analytics')
+}
+
+/** GET /api/admin/attempts -> array of attempt summaries */
+export function getAdminAttempts() {
+  return request('/api/admin/attempts')
+}
+
+/** GET /api/admin/attempts/{id} -> attempt details with questions */
+export function getAdminAttemptDetails(attemptId) {
+  return request(`/api/admin/attempts/${attemptId}`)
+}
+
+/** POST /api/admin/admins -> { message, id, name, email, role } */
+export function createAdminAccount({ name, email, password }) {
+  return request('/api/admin/admins', {
+    method: 'POST',
+    body: { name, email, password },
+  })
 }
 

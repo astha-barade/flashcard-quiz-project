@@ -9,6 +9,7 @@ import DailyQuiz from './pages/DailyQuiz'
 import QuizResults from './pages/QuizResults'
 import MyAttempts from './pages/MyAttempts'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminAnalytics from './pages/AdminAnalytics'
 import NotFound from './pages/NotFound'
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         {/* Admin-only pages (backend: /api/admin/** requires ROLE_ADMIN) */}
         <Route element={<ProtectedRoute role="ADMIN" />}>
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/analytics" element={<AdminAnalytics />} />
         </Route>
 
         <Route path="*" element={<NotFound />} />
@@ -44,3 +46,4 @@ export default function App() {
     </Routes>
   )
 }
+

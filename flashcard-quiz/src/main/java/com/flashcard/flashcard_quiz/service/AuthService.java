@@ -46,4 +46,33 @@ public class AuthService {
 
         return user;
     }
+
+    public User createAdmin(String name, String email, String password) {
+        if (name == null || name.isBlank()) {
+            throw new RuntimeException("Name is required");
+        }
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("Email is required");
+        }
+        if (password == null || password.isBlank()) {
+            throw new RuntimeException("Password is required");
+        }
+        if (password.length() < 6) {
+            throw new RuntimeException("Password must be at least 6 characters");
+        }
+
+        String cleanEmail = email.trim().toLowerCase();
+        if (userRepository.existsByEmail(cleanEmail)) {
+            throw new RuntimeException("Email already registered");
+        }
+
+        User user = new User();
+        user.setName(name.trim());
+        user.setEmail(cleanEmail);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setRole(User.Role.ADMIN);
+
+        return userRepository.save(user);
+    }
 }
+
