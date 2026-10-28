@@ -1,6 +1,6 @@
 
-package com.flashcard.flashcard_quiz.service;
 
+package com.flashcard.flashcard_quiz.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -27,7 +27,7 @@ public class GrokAiService {
     @Value("${gemini.api.url:https://generativelanguage.googleapis.com/v1beta}")
     private String apiUrl;
 
-    @Value("${gemini.api.model:gemini-2.5-flash}")
+    @Value("${gemini.api.model:gemini-3.8-flash}")
     private String model;
 
     private final RestClient restClient;
@@ -37,8 +37,8 @@ public class GrokAiService {
         SimpleClientHttpRequestFactory factory =
                 new SimpleClientHttpRequestFactory();
 
-        factory.setConnectTimeout(Duration.ofSeconds(10));
-        factory.setReadTimeout(Duration.ofSeconds(45));
+        factory.setConnectTimeout(Duration.ofSeconds(15));
+        factory.setReadTimeout(Duration.ofSeconds(120));
 
         this.restClient = RestClient.builder()
                 .requestFactory(factory)
@@ -92,41 +92,40 @@ public class GrokAiService {
         );
 
         try {
-            Map<?, ?> response = restClient.post()
+            String responseBody = restClient.post()
                     .uri(apiUrl + "/models/" + model + ":generateContent")
                     .header("x-goog-api-key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON)
                     .body(requestBody)
-                    .retrieve()
-                    .body(Map.class);
+                    .exchange((request, response) -> {
+                        try (var body = response.getBody()) {
+                            return new String(
+                                    body.readAllBytes(),
+                                    java.nio.charset.StandardCharsets.UTF_8
+                            );
+                        }
+                    });
 
-            if (response == null) {
-                throw new IllegalStateException(
-                        "Empty response from Gemini API."
-                );
+            if (responseBody == null || responseBody.isBlank()) {
+                throw new IllegalStateException("Empty response from Gemini API.");
             }
 
-            List<?> candidates =
-                    (List<?>) response.get("candidates");
+            JsonNode response = objectMapper.readTree(responseBody);
+            log.info("Gemini response: {}", responseBody);
+            JsonNode candidates = response.path("candidates");
 
-            if (candidates == null || candidates.isEmpty()) {
+            if (!candidates.isArray() || candidates.isEmpty()) {
                 throw new IllegalStateException(
                         "Gemini returned no candidates."
                 );
             }
 
-            Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
-            Map<?, ?> content = (Map<?, ?>) candidate.get("content");
+            JsonNode parts = candidates.get(0)
+                    .path("content")
+                    .path("parts");
 
-            if (content == null) {
-                throw new IllegalStateException(
-                        "Gemini response content is missing."
-                );
-            }
-
-            List<?> parts = (List<?>) content.get("parts");
-
-            if (parts == null || parts.isEmpty()) {
+            if (!parts.isArray() || parts.isEmpty()) {
                 throw new IllegalStateException(
                         "Gemini response parts are missing."
                 );
@@ -134,10 +133,11 @@ public class GrokAiService {
 
             StringBuilder result = new StringBuilder();
 
-            for (Object item : parts) {
-                if (item instanceof Map<?, ?> part
-                        && part.get("text") != null) {
-                    result.append(part.get("text"));
+            for (JsonNode part : parts) {
+                JsonNode text = part.get("text");
+
+                if (text != null && text.isTextual()) {
+                    result.append(text.asText());
                 }
             }
 
@@ -148,8 +148,9 @@ public class GrokAiService {
             }
 
             return result.toString();
-
         }
+
+
     catch (RestClientResponseException e) {
         int status = e.getStatusCode().value();
         String responseBody = e.getResponseBodyAsString();
