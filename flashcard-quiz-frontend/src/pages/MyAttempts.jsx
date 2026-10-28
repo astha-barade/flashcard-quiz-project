@@ -11,11 +11,13 @@ import EmptyState from '../components/EmptyState'
 import { LoadingBlock } from '../components/Spinner'
 import PageHeader from '../components/PageHeader'
 import AttemptReview from '../components/AttemptReview'
+import { IconTrophy, IconSearch, IconCalendar, IconCheckCircle } from '../components/Icons'
 
 export default function MyAttempts() {
   const { user } = useAuth()
   const [state, setState] = useState({ status: 'loading' })
   const [reloadKey, setReloadKey] = useState(0)
+  const [searchQuery, setSearchQuery] = useState('')
 
   // Review modal state
   const [selectedAttemptId, setSelectedAttemptId] = useState(null)
@@ -63,6 +65,16 @@ export default function MyAttempts() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedAttemptId, closeReview])
 
+  const attempts = state.status === 'ready' ? state.attempts : []
+  const filteredAttempts = attempts.filter((a) => {
+    if (!searchQuery.trim()) return true
+    const q = searchQuery.toLowerCase().trim()
+    return (
+      (a.title && a.title.toLowerCase().includes(q)) ||
+      (a.topic && a.topic.toLowerCase().includes(q))
+    )
+  })
+
   return (
     <>
       <PageHeader title="My attempts" subtitle="Every quiz you've submitted, newest first." />
@@ -83,7 +95,7 @@ export default function MyAttempts() {
         </Alert>
       )}
 
-      {state.status === 'ready' && state.attempts.length === 0 && (
+      {state.status === 'ready' && attempts.length === 0 && (
         <div className="card">
           <EmptyState
             icon="📝"
@@ -95,51 +107,87 @@ export default function MyAttempts() {
         </div>
       )}
 
-      {state.status === 'ready' && state.attempts.length > 0 && (
-        <div className="card table-card">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Quiz</th>
-                <th>Quiz date</th>
-                <th>Submitted</th>
-                <th>Score</th>
-                <th>Result</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {state.attempts.map((a) => (
-                <tr key={a.id}>
-                  <td data-label="Quiz">
-                    <div className="cell-stack">
-                      <strong>{a.title}</strong>
-                      {a.topic && <span className="muted small">{a.topic}</span>}
-                    </div>
-                  </td>
-                  <td data-label="Quiz date">{formatDate(a.quizDate)}</td>
-                  <td data-label="Submitted">{formatDateTime(a.submittedAt)}</td>
-                  <td data-label="Score">{a.score} / {a.total}</td>
-                  <td data-label="Result">
-                    <Badge tone={a.percent >= 80 ? 'green' : a.percent >= 50 ? 'navy' : 'amber'}>
-                      {a.percent}%
-                    </Badge>
-                  </td>
-                  <td data-label="Details">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => openReview(a.id)}
-                      aria-label={`View details for ${a.title}`}
-                    >
-                      View Details
-                    </Button>
-                  </td>
+      {state.status === 'ready' && attempts.length > 0 && (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '1rem',
+              marginBottom: '1rem',
+            }}
+          >
+            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+              <span className="badge badge-navy">
+                {attempts.length} Total Attempt{attempts.length === 1 ? '' : 's'}
+              </span>
+              <span className="badge badge-green">
+                Avg. {Math.round(attempts.reduce((acc, x) => acc + x.percent, 0) / attempts.length)}%
+              </span>
+            </div>
+
+            <div style={{ position: 'relative', width: 'min(100%, 280px)' }}>
+              <input
+                type="search"
+                placeholder="Search quiz title or topic…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  padding: '0.5rem 0.85rem',
+                  fontSize: '0.88rem',
+                  borderRadius: 'var(--radius-sm)',
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="card table-card">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Quiz</th>
+                  <th>Quiz date</th>
+                  <th>Submitted</th>
+                  <th>Score</th>
+                  <th>Result</th>
+                  <th>Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filteredAttempts.map((a) => (
+                  <tr key={a.id}>
+                    <td data-label="Quiz">
+                      <div className="cell-stack">
+                        <strong>{a.title}</strong>
+                        {a.topic && <span className="muted small">{a.topic}</span>}
+                      </div>
+                    </td>
+                    <td data-label="Quiz date">{formatDate(a.quizDate)}</td>
+                    <td data-label="Submitted">{formatDateTime(a.submittedAt)}</td>
+                    <td data-label="Score">{a.score} / {a.total}</td>
+                    <td data-label="Result">
+                      <Badge tone={a.percent >= 80 ? 'green' : a.percent >= 50 ? 'navy' : 'amber'}>
+                        {a.percent}%
+                      </Badge>
+                    </td>
+                    <td data-label="Details">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => openReview(a.id)}
+                        aria-label={`View details for ${a.title}`}
+                      >
+                        View Details
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* Review Modal Dialog */}
@@ -157,7 +205,7 @@ export default function MyAttempts() {
                 <h2 id="modal-review-title" style={{ margin: 0 }}>
                   Question-wise Review
                 </h2>
-                <span className="muted small">Attempt #{selectedAttemptId}</span>
+                <span className="muted small">Attempt {selectedAttemptId}</span>
               </div>
               <button className="modal-close" onClick={closeReview} aria-label="Close review dialog">
                 ✕
@@ -195,4 +243,3 @@ export default function MyAttempts() {
     </>
   )
 }
-

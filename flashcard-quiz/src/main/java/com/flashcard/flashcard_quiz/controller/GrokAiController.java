@@ -19,25 +19,74 @@ public class GrokAiController {
     }
 
     @PostMapping("/generate")
-    public ResponseEntity<?> generate(@RequestBody Map<String, String> request) {
-        String prompt = request.get("prompt");
+    public ResponseEntity<?> generate(
+            @RequestBody(required = false) Map<String, String> request) {
 
-        if (prompt == null || prompt.isBlank()) {
+        if (request == null || request.isEmpty()) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("error", "Prompt is required"));
+                    .body(Map.of("error", "Request body is required"));
+        }
+
+        String topic = request.get("topic");
+
+        if (topic == null || topic.isBlank()) {
+            topic = request.get("prompt");
+        }
+
+        if (topic == null || topic.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Topic or prompt is required"));
         }
 
         try {
-            String answer = grokAiService.generateText(prompt);
-            return ResponseEntity.ok(Map.of("answer", answer));
-        } catch (Exception e) {
-            e.printStackTrace();
+            Map<String, Object> result =
+                    grokAiService.generateQuizQuestions(topic.trim());
 
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+            return ResponseEntity.ok(result);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", safeMessage(e)));
+
+        } catch (IllegalStateException e) {
+            String msg = safeMessage(e);
+            String lowerMsg = msg.toLowerCase();
+            HttpStatus status = HttpStatus.BAD_GATEWAY;
+
+            if (lowerMsg.contains("api key missing")
+                    || lowerMsg.contains("api key is missing")) {
+                status = HttpStatus.SERVICE_UNAVAILABLE;
+            } else if (lowerMsg.contains("http 401")
+                    || lowerMsg.contains("http 403")) {
+                status = HttpStatus.BAD_GATEWAY;
+
+            } else if (lowerMsg.contains("http 402")
+                    || lowerMsg.contains("insufficient credits")
+                    || lowerMsg.contains("spending limit")) {
+                status = HttpStatus.PAYMENT_REQUIRED;
+            } else if (lowerMsg.contains("http 429")
+                    || lowerMsg.contains("rate limit")
+                    || lowerMsg.contains("quota")) {
+                status = HttpStatus.TOO_MANY_REQUESTS;
+            } else if (lowerMsg.contains("http 400")) {
+                status = HttpStatus.BAD_REQUEST;
+            }
+
+            return ResponseEntity.status(status)
+                    .body(Map.of("error", msg));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of(
                             "error",
-                            "Grok AI request failed. Check backend console."
+                            "Unexpected error generating questions."
                     ));
         }
+    }
+
+    private String safeMessage(Exception e) {
+        return e.getMessage() != null
+                ? e.getMessage()
+                : "Gemini API processing failed.";
     }
 }

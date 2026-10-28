@@ -4,6 +4,7 @@ import { homePathFor, useAuth } from '../context/AuthContext'
 import Alert from '../components/Alert'
 import Button from '../components/Button'
 import FormField from '../components/FormField'
+import { IconBook, IconCheckCircle, IconSparkles, IconTrophy } from '../components/Icons'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -55,9 +56,30 @@ export default function Login() {
   return (
     <div className="auth-wrap">
       <aside className="auth-brand">
-        <span className="brand-mark big" aria-hidden="true">▤</span>
+        <span className="brand-mark big" aria-hidden="true">
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/>
+            <path d="M6 6h10"/>
+            <path d="M6 10h10"/>
+          </svg>
+        </span>
         <h2>Learn a little, every day.</h2>
         <p>One quiz a day, instant scores, and a record of every attempt.</p>
+
+        <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.92rem', color: '#e2e8f0' }}>
+            <span style={{ color: '#60a5fa' }}><IconSparkles size={18} /></span>
+            <span>Daily curated flashcard challenges</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.92rem', color: '#e2e8f0' }}>
+            <span style={{ color: '#34d399' }}><IconCheckCircle size={18} /></span>
+            <span>Immediate answer validation and detailed reviews</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.92rem', color: '#e2e8f0' }}>
+            <span style={{ color: '#fbbf24' }}><IconTrophy size={18} /></span>
+            <span>Consistent progress tracking and learning streaks</span>
+          </div>
+        </div>
       </aside>
 
       <section className="auth-card">
@@ -85,7 +107,7 @@ export default function Login() {
             onChange={(e) => setPassword(e.target.value)}
             error={errors.password}
           />
-          <Button type="submit" loading={loading} block>
+          <Button type="submit" loading={loading} block style={{ fontWeight: 700, padding: '0.75rem' }}>
             Log in
           </Button>
         </form>

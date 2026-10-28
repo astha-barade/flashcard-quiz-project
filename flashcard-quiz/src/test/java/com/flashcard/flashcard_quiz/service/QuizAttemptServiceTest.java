@@ -53,7 +53,7 @@ class QuizAttemptServiceTest {
         Quiz quiz = new Quiz();
         quiz.setTitle("Integration Test Quiz");
         quiz.setTopic("Testing");
-        quiz.setQuizDate(LocalDate.now().plusDays(100)); // Future unique date
+        quiz.setQuizDate(LocalDate.now()); // Future unique date
         quiz.setPublished(true);
         final Quiz savedQuiz = quizRepository.save(quiz);
 

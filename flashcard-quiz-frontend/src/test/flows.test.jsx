@@ -311,47 +311,25 @@ describe('full journey: admin builds a quiz, student takes it', () => {
     expect(mock.db.quizzes.find((q) => q.id === 2).published).toBe(false)
 
     // 3. Delete Question & Edit Question
-    // Questions for Quiz #1 are displayed in the questions card
-    expect(await screen.findByText(/Questions in Quiz #1/)).toBeInTheDocument()
-    expect(screen.getByText(/#1\. Q1/)).toBeInTheDocument()
+    // Questions for Quiz 1 are displayed in the questions card
+    expect(await screen.findByText(/Questions in Quiz 1/)).toBeInTheDocument()
+    expect(screen.getByText(/1\. Q1/)).toBeInTheDocument()
 
     // Edit Question
-    const qItem = screen.getByText(/#1\. Q1/).closest('li')
+    const qItem = screen.getByText(/1\. Q1/).closest('li')
     await user.click(within(qItem).getByRole('button', { name: 'Edit' }))
     const editQModal = screen.getByRole('dialog', { name: /Edit Question/i })
     const qTextInput = within(editQModal).getByLabelText('Question text')
     await user.clear(qTextInput)
     await user.type(qTextInput, 'Updated Q1 text')
     await user.click(within(editQModal).getByRole('button', { name: 'Save changes' }))
-    expect(await screen.findByText(/Question #1 updated successfully/)).toBeInTheDocument()
+    expect(await screen.findByText(/Question 1 updated successfully/)).toBeInTheDocument()
     expect(mock.db.questions.find((q) => q.id === 1).questionText).toBe('Updated Q1 text')
 
-    // Delete Question (when no attempts)
-    const updatedQItem = screen.getByText(/#1\. Updated Q1 text/).closest('li')
-    await user.click(within(updatedQItem).getByRole('button', { name: 'Delete' }))
-    const deleteQModal = screen.getByRole('dialog', { name: /Delete Question/i })
-    await user.click(within(deleteQModal).getByRole('button', { name: 'Confirm delete' }))
-    expect(await screen.findByText(/Question #1 deleted successfully/)).toBeInTheDocument()
-    expect(mock.db.questions.some((q) => q.id === 1)).toBe(false)
-
-    // Select Quiz #2 (which has student attempts) to test question deletion guard and archiving
-    await user.selectOptions(screen.getByLabelText('Quiz'), '2')
-    expect(await screen.findByText(/Questions in Quiz #2/)).toBeInTheDocument()
-    expect(screen.getByText(/#1\. Q2/)).toBeInTheDocument()
-
-    const q2Item = screen.getByText(/#1\. Q2/).closest('li')
-    await user.click(within(q2Item).getByRole('button', { name: 'Delete' }))
-    const deleteQ2Modal = screen.getByRole('dialog', { name: /Delete Question/i })
-    expect(within(deleteQ2Modal).getByText(/Permanent deletion blocked/)).toBeInTheDocument()
-    expect(within(deleteQ2Modal).getByRole('button', { name: 'Confirm delete' })).toBeDisabled()
-
-    // Click "Archive Question" from modal
-    await user.click(within(deleteQ2Modal).getByRole('button', { name: 'Archive Question' }))
-    expect(await screen.findByText(/Question #2 has been archived/)).toBeInTheDocument()
-    expect(mock.db.questions.find((q) => q.id === 2).archived).toBe(true)
-
-    // Verify Archived badge is displayed in question list
-    expect(screen.getByText('Archived')).toBeInTheDocument()
+    // Verify Delete Question button is removed from Admin Dashboard
+    const updatedQItem = screen.getByText(/1\. Updated Q1 text/).closest('li')
+    expect(within(updatedQItem).queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(within(updatedQItem).getByRole('button', { name: 'Edit' })).toBeInTheDocument()
 
     // 4. Delete Quiz (successful when no attempts)
     const renamedQuizItem = screen.getByText('Renamed Quiz Title').closest('li')

@@ -104,7 +104,7 @@ export function createMockBackend() {
     const isAuth = path.startsWith('/api/auth/')
     if (!isAuth) {
       if (badCredentials || !principal) return deny401()
-      if (path.startsWith('/api/admin/') && principal.role !== 'ADMIN') { res.writeHead(403, cors); return res.end() }
+      if ((path.startsWith('/api/admin/') || path.startsWith('/api/ai/')) && principal.role !== 'ADMIN') { res.writeHead(403, cors); return res.end() }
       if (path.startsWith('/api/student/') && principal.role !== 'STUDENT') { res.writeHead(403, cors); return res.end() }
     }
 
@@ -442,6 +442,29 @@ export function createMockBackend() {
         name: admin.name,
         email: admin.email,
         role: admin.role,
+      }, cors)
+    }
+
+    if (m('POST', /^\/api\/ai\/generate$/)) {
+      const topic = body?.topic || body?.prompt
+      if (!topic || !topic.trim()) return bad(res, 'Topic or prompt is required')
+      const sanitized = topic.trim()
+      const questions = Array.from({ length: 10 }, (_, i) => ({
+        id: i + 1,
+        questionText: `What is a key concept of ${sanitized} (Question ${i + 1})?`,
+        optionA: `Primary option A for ${sanitized}`,
+        optionB: `Secondary option B for ${sanitized}`,
+        optionC: `Tertiary option C for ${sanitized}`,
+        optionD: `Alternative option D for ${sanitized}`,
+        correctOption: ['A', 'B', 'C', 'D'][i % 4],
+        correctAnswer: ['A', 'B', 'C', 'D'][i % 4],
+        explanation: `Explanation for question ${i + 1} regarding ${sanitized}`,
+      }))
+      return send(res, 200, {
+        topic: sanitized,
+        count: 10,
+        questions,
+        answer: `Generated 10 MCQs for topic: ${sanitized}`,
       }, cors)
     }
 

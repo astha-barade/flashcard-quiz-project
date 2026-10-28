@@ -10,6 +10,7 @@ import EmptyState from '../components/EmptyState'
 import { LoadingBlock } from '../components/Spinner'
 import ScoreRing from '../components/ScoreRing'
 import AttemptReview from '../components/AttemptReview'
+import { IconTrophy, IconCheckCircle, IconXCircle, IconArrowRight, IconBook } from '../components/Icons'
 
 function verdict(pct) {
   if (pct >= 80) return { emoji: '🎉', text: 'Excellent work!' }
@@ -144,11 +145,12 @@ export default function QuizResults() {
   const { score, total, title, topic, submittedAt } = state.result
   const pct = calcPercent(score, total)
   const v = verdict(pct)
+  const incorrect = Math.max(0, total - score)
 
   return (
     <div className="card results-card" style={{ maxWidth: '820px', margin: '0 auto' }}>
       <p className="eyebrow">Quiz results</p>
-      <h1>{title || `Quiz #${quizId}`}</h1>
+      <h1>{title || `Quiz ${quizId}`}</h1>
       {topic && <p className="muted">Topic: {topic}</p>}
 
       <ScoreRing percent={pct}>
@@ -159,8 +161,31 @@ export default function QuizResults() {
       <p className="verdict"><span aria-hidden="true">{v.emoji}</span> {v.text}</p>
       {submittedAt && <p className="muted small">Submitted {formatDateTime(submittedAt)}</p>}
 
-      <div style={{ margin: '1.75rem 0', textAlign: 'left' }}>
-        <h2 style={{ fontSize: '1.25rem', marginBottom: '0.75rem' }}>Question Review</h2>
+      {/* Metric highlights */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+          gap: '0.75rem',
+          margin: '1.5rem 0',
+        }}
+      >
+        <div style={{ padding: '0.85rem', background: 'var(--surface-subtle)', borderRadius: '10px', border: '1px solid var(--border)' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 600 }}>Total Questions</span>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--navy-950)' }}>{total}</div>
+        </div>
+        <div style={{ padding: '0.85rem', background: 'var(--green-bg)', borderRadius: '10px', border: '1px solid var(--green-border)' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--green)', fontWeight: 600 }}>Correct</span>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--green)' }}>{score}</div>
+        </div>
+        <div style={{ padding: '0.85rem', background: incorrect > 0 ? 'var(--red-bg)' : 'var(--surface-subtle)', borderRadius: '10px', border: incorrect > 0 ? '1px solid var(--red-border)' : '1px solid var(--border)' }}>
+          <span style={{ fontSize: '0.8rem', color: incorrect > 0 ? 'var(--red)' : 'var(--muted)', fontWeight: 600 }}>Incorrect</span>
+          <div style={{ fontSize: '1.4rem', fontWeight: 800, color: incorrect > 0 ? 'var(--red)' : 'var(--navy-950)' }}>{incorrect}</div>
+        </div>
+      </div>
+
+      <div style={{ margin: '2rem 0', textAlign: 'left' }}>
+        <h2 style={{ fontSize: '1.3rem', marginBottom: '0.85rem' }}>Question Review</h2>
         {loadingReview && <LoadingBlock message="Loading detailed answer review…" />}
 
         {review && <AttemptReview review={review} />}
@@ -179,4 +204,3 @@ export default function QuizResults() {
     </div>
   )
 }
-

@@ -293,6 +293,21 @@ describe('api service', () => {
     expect(review.hasDetailedReview).toBe(true)
     expect(review.questions[0].questionText).toBe('Q With Attempt')
   })
+
+  it('generateAiQuestions generates exactly 10 MCQs on the given topic for admin', async () => {
+    await api.loginUser({ email: 'admin@test.com', password: 'adminpass' })
+    const res = await api.generateAiQuestions('Java Multithreading')
+    expect(res).toBeDefined()
+    expect(res.topic).toBe('Java Multithreading')
+    expect(res.count).toBe(10)
+    expect(res.questions).toHaveLength(10)
+    expect(res.questions[0].questionText).toContain('Java Multithreading')
+    expect(res.questions[0].optionA).toBeDefined()
+    expect(res.questions[0].optionB).toBeDefined()
+    expect(res.questions[0].optionC).toBeDefined()
+    expect(res.questions[0].optionD).toBeDefined()
+    expect(['A', 'B', 'C', 'D']).toContain(res.questions[0].correctOption)
+  })
 })
 
 

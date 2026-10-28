@@ -11,7 +11,7 @@ export function normalizeAttempt(a) {
   return {
     id: a?.id,
     quizId,
-    title: quiz?.title || (quizId != null ? `Quiz #${quizId}` : 'Quiz'),
+    title: quiz?.title || (quizId != null ? `Quiz ${quizId}` : 'Quiz'),
     topic: quiz?.topic || '',
     quizDate: quiz?.quizDate || null,
     score,

@@ -8,6 +8,7 @@ import Button from '../components/Button'
 import EmptyState from '../components/EmptyState'
 import { LoadingBlock } from '../components/Spinner'
 import ProgressBar from '../components/ProgressBar'
+import { IconClock, IconCheckCircle, IconAlertCircle, IconArrowRight, IconArrowLeft } from '../components/Icons'
 
 const LETTERS = ['A', 'B', 'C', 'D']
 
@@ -21,6 +22,7 @@ export default function DailyQuiz() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
+  const [secondsElapsed, setSecondsElapsed] = useState(0)
 
   // ---- load today's quiz (and check, best-effort, if it was already submitted) ----
   useEffect(() => {
@@ -65,6 +67,21 @@ export default function DailyQuiz() {
       cancelled = true
     }
   }, [user.id, reloadKey])
+
+  // Pacing timer: counts seconds elapsed while answering
+  useEffect(() => {
+    if (state.status !== 'ready') return
+    const timer = setInterval(() => {
+      setSecondsElapsed((s) => s + 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [state.status])
+
+  function formatTime(totalSec) {
+    const mins = Math.floor(totalSec / 60)
+    const secs = totalSec % 60
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  }
 
   function choose(questionId, letter) {
     const next = { ...answers, [questionId]: letter }
@@ -158,11 +175,40 @@ export default function DailyQuiz() {
     <div className="quiz-page">
       <div className="quiz-top">
         <div>
-          <h1>{quiz.title}</h1>
-          <p className="muted">Topic: {quiz.topic}</p>
+          <span className="eyebrow" style={{ marginBottom: '0.2rem' }}>
+            Daily Flashcard Quiz
+          </span>
+          <h1 style={{ margin: 0 }}>{quiz.title}</h1>
+          <p className="muted" style={{ margin: '0.2rem 0 0' }}>
+            Topic: <strong style={{ color: 'var(--navy-900)' }}>{quiz.topic}</strong>
+          </p>
         </div>
-        <span className="quiz-count">{answeredCount}/{total} answered</span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.88rem',
+              fontWeight: 700,
+              color: 'var(--navy-900)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              padding: '0.3rem 0.8rem',
+              borderRadius: '999px',
+            }}
+          >
+            <IconClock size={15} style={{ color: 'var(--blue-500)' }} />
+            {formatTime(secondsElapsed)}
+          </span>
+
+          <span className="quiz-count">
+            {answeredCount}/{total} answered
+          </span>
+        </div>
       </div>
+
       <ProgressBar value={answeredCount} max={total} label="Questions answered" />
 
       {submitError && (
@@ -178,6 +224,76 @@ export default function DailyQuiz() {
           {submitError}
         </Alert>
       )}
+
+      {/* Question quick-jump bar */}
+      <div
+        style={{
+          display: 'flex',
+          gap: '0.4rem',
+          alignItems: 'center',
+          overflowX: 'auto',
+          padding: '0.4rem 0 0.85rem',
+          marginBottom: '0.5rem',
+        }}
+      >
+        {questions.map((item, idx) => {
+          const isAnswered = Boolean(answers[item.id])
+          const isCurrent = step === idx
+          return (
+            <button
+              key={item.id}
+              onClick={() => setStep(idx)}
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                border: isCurrent
+                  ? '2px solid var(--blue-500)'
+                  : isAnswered
+                  ? '1px solid #93c5fd'
+                  : '1px solid var(--border)',
+                background: isCurrent
+                  ? 'var(--blue-500)'
+                  : isAnswered
+                  ? 'var(--blue-50)'
+                  : 'var(--surface)',
+                color: isCurrent
+                  ? '#fff'
+                  : isAnswered
+                  ? 'var(--blue-600)'
+                  : 'var(--muted)',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'inline-grid',
+                placeItems: 'center',
+                flexShrink: 0,
+                transition: 'all 0.15s ease',
+              }}
+              title={`Question ${idx + 1}: ${isAnswered ? 'Answered' : 'Unanswered'}`}
+            >
+              {idx + 1}
+            </button>
+          )
+        })}
+        <button
+          onClick={() => setStep(total)}
+          style={{
+            padding: '0 0.75rem',
+            height: '32px',
+            borderRadius: '8px',
+            border: onReview ? '2px solid var(--blue-500)' : '1px solid var(--border)',
+            background: onReview ? 'var(--blue-50)' : 'var(--surface)',
+            color: onReview ? 'var(--blue-600)' : 'var(--muted)',
+            fontWeight: 700,
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          Review
+        </button>
+      </div>
 
       {!onReview && (
         <div className="card flashcard">
@@ -205,7 +321,11 @@ export default function DailyQuiz() {
           </div>
 
           <div className="quiz-nav">
-            <Button variant="secondary" disabled={step === 0} onClick={() => setStep(step - 1)}>
+            <Button
+              variant="secondary"
+              disabled={step === 0}
+              onClick={() => setStep(step - 1)}
+            >
               ← Previous
             </Button>
             <Button onClick={() => setStep(step + 1)}>
@@ -216,9 +336,28 @@ export default function DailyQuiz() {
       )}
 
       {onReview && (
-        <div className="card">
-          <h2>Review your answers</h2>
-          <p className="muted">Select a number to go back to that question.</p>
+        <div className="card" style={{ padding: '2.25rem 2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
+            <span
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                background: 'var(--blue-50)',
+                color: 'var(--blue-500)',
+                display: 'inline-grid',
+                placeItems: 'center',
+              }}
+            >
+              <IconCheckCircle size={22} />
+            </span>
+            <h2 style={{ margin: 0 }}>Review your answers</h2>
+          </div>
+
+          <p className="muted" style={{ margin: '0 0 1.25rem' }}>
+            Select a number to go back to that question.
+          </p>
+
           <div className="review-grid">
             {questions.map((item, i) => (
               <button
@@ -237,11 +376,37 @@ export default function DailyQuiz() {
               {unanswered} question{unanswered === 1 ? ' is' : 's are'} unanswered and will count as incorrect.
             </Alert>
           )}
-          <p className="muted small">You can only submit this quiz once.</p>
+
+          <div
+            style={{
+              padding: '1rem 1.25rem',
+              background: 'var(--surface-subtle)',
+              borderRadius: '10px',
+              border: '1px solid var(--border)',
+              margin: '1.25rem 0',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <strong>Submission Confirmation:</strong>
+                <p className="muted small" style={{ margin: '0.2rem 0 0' }}>
+                  You can only submit this quiz once.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '0.6rem' }}>
+                <span className="badge badge-green">{answeredCount} Answered</span>
+                {unanswered > 0 && <span className="badge badge-amber">{unanswered} Unanswered</span>}
+              </div>
+            </div>
+          </div>
 
           <div className="quiz-nav">
-            <Button variant="secondary" onClick={() => setStep(total - 1)}>← Back to questions</Button>
-            <Button onClick={handleSubmit} loading={submitting}>Submit quiz</Button>
+            <Button variant="secondary" onClick={() => setStep(total - 1)}>
+              ← Back to questions
+            </Button>
+            <Button onClick={handleSubmit} loading={submitting} style={{ fontWeight: 700 }}>
+              Submit quiz
+            </Button>
           </div>
         </div>
       )}

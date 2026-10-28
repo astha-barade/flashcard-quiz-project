@@ -291,3 +291,19 @@ export function createAdminAccount({ name, email, password }) {
   })
 }
 
+// =====================================================================
+// AI   (role ADMIN)
+// =====================================================================
+
+/**
+ * POST /api/ai/generate
+ * body: { topic, prompt }
+ * -> { topic, count, questions: [{questionText, optionA..D, correctOption, explanation}], answer }
+ */
+export function generateAiQuestions(topic) {
+  return request('/api/ai/generate', {
+    method: 'POST',
+    body: { topic, prompt: topic },
+  })
+}
+

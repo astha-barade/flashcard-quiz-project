@@ -171,7 +171,7 @@ export default function AdminAnalytics() {
                 <table className="table" style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr>
-                      <th>Attempt #</th>
+                      <th>Attempt</th>
                       <th>Date / Time</th>
                       <th>Student</th>
                       <th>Quiz</th>
@@ -184,7 +184,7 @@ export default function AdminAnalytics() {
                     {filteredAttempts.map((a) => (
                       <tr key={a.id || a.attemptId}>
                         <td>
-                          <strong>#{a.id || a.attemptId}</strong>
+                          <strong>{a.id || a.attemptId}</strong>
                         </td>
                         <td>
                           <span className="small muted">
@@ -268,7 +268,7 @@ export default function AdminAnalytics() {
                 <h2 id="modal-analytics-title" style={{ margin: 0 }}>
                   Question-wise Review
                 </h2>
-                <span className="muted small">Attempt #{selectedAttemptId}</span>
+                <span className="muted small">Attempt {selectedAttemptId}</span>
               </div>
               <button
                 className="modal-close"
